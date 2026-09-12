@@ -15,6 +15,7 @@ const express = require("express");
 const multer = require("multer");
 const { WebSocketServer } = require("ws");
 const http = require("http");
+const path = require("path");
 const crypto = require("crypto");
 
 const PORT = process.env.PORT || 10000;
@@ -30,6 +31,12 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json());
+
+// Serve the same app shell used locally, so this relay's own URL is
+// something you can add to a phone's home screen and have it always open
+// (it's HTTPS, so — unlike the local printer PC — it works as a real
+// installed app away from any particular network).
+app.use(express.static(path.join(__dirname, "public")));
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_MB * 1024 * 1024 } });
 
@@ -57,10 +64,6 @@ function rpc(deviceId, message, timeoutMs = RPC_TIMEOUT_MS) {
     send(device.ws, { ...message, requestId });
   });
 }
-
-app.get("/", (req, res) => {
-  res.type("text/plain").send("LAN Print relay is running.");
-});
 
 app.get("/relay/:id/status", (req, res) => {
   const device = devices.get(req.params.id);

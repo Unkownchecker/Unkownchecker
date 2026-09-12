@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>LAN Print</title>
+<link rel="manifest" href="/manifest.json" />
+<link rel="icon" href="/icons/icon-192.png" />
+<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+<meta name="theme-color" content="#B23A48" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<style>
+  :root{
+    --paper:#E9ECEE; --card:#FFFFFF; --ink:#1B1F23; --ink-soft:#565D66;
+    --stamp:#B23A48; --stamp-dark:#8E2D39; --ok:#2F6F4E; --line:#C7CDD3;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh; display:flex; justify-content:center; padding:32px 16px 64px;
+  }
+  .hidden{ display:none !important; }
+  .sheet{ width:100%; max-width:420px; }
+  .ticket{ background:var(--card); border:1px solid var(--line); position:relative; }
+  .perf{ height:0; border-bottom:2px dashed var(--line); position:relative; }
+  .perf::before, .perf::after{ content:""; position:absolute; top:-9px; width:18px; height:18px; background:var(--paper); border-radius:50%; }
+  .perf::before{ left:-9px; } .perf::after{ right:-9px; }
+
+  .head{ padding:28px 26px 22px; text-align:center; }
+  .head h1{ font-family:"Courier New", ui-monospace, monospace; font-weight:700; font-size:26px; letter-spacing:3px; margin:0 0 6px; }
+  .head p{ margin:0; font-size:13px; color:var(--ink-soft); }
+
+  /* Connection / discovery state */
+  #connection{ padding:34px 26px 30px; text-align:center; }
+  .spinner{
+    width:34px; height:34px; margin:0 auto 18px; border-radius:50%;
+    border:3px solid var(--line); border-top-color:var(--stamp);
+    animation:spin 0.9s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  #connStatus{ font-size:14px; color:var(--ink-soft); min-height:20px; }
+  #rescanBtn{
+    margin-top:16px; border:1px solid var(--line); background:#fff; padding:9px 16px;
+    font-size:13px; border-radius:2px; cursor:pointer; color:var(--stamp-dark); font-weight:600;
+  }
+  #manualForm{ margin-top:20px; text-align:left; }
+  #manualForm label{ display:block; font-size:12px; color:var(--ink-soft); margin-bottom:6px; }
+  #manualForm .row{ display:flex; gap:8px; }
+  #manualForm input{
+    flex:1; padding:11px 12px; border:1px solid var(--line); background:#fff; font-size:14px; border-radius:2px;
+  }
+  #manualForm button{
+    background:var(--stamp); color:#fff; border:none; padding:0 16px; font-size:13px; font-weight:700; border-radius:2px; cursor:pointer;
+  }
+  #manualForm .hint{ font-size:11px; color:var(--ink-soft); margin-top:8px; line-height:1.5; }
+
+  .tabs{ display:flex; gap:8px; margin-bottom:20px; }
+  .tab{
+    flex:1; padding:9px 10px; border:1px solid var(--line); background:#fff; font-size:12px;
+    font-weight:600; color:var(--ink-soft); border-radius:2px; cursor:pointer;
+  }
+  .tab.active{ background:var(--stamp); border-color:var(--stamp); color:#fff; }
+
+  #remoteForm{ margin-top:4px; text-align:left; }
+  #remoteForm label{ display:block; font-size:12px; color:var(--ink-soft); margin-bottom:6px; }
+  #remoteForm input{ width:100%; padding:11px 12px; border:1px solid var(--line); background:#fff; font-size:14px; border-radius:2px; }
+  #remoteForm button{ background:var(--stamp); color:#fff; border:none; padding:12px; font-size:13px; font-weight:700; border-radius:2px; cursor:pointer; }
+  #remoteForm .hint{ font-size:11px; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
+
+  /* Print form */
+  .form{ padding:24px 26px 26px; }
+  .field{ margin-bottom:18px; }
+  .field label{ display:block; font-size:12px; color:var(--ink-soft); margin-bottom:6px; }
+  select, .filebtn, input[type=text]{
+    width:100%; padding:12px 12px; border:1px solid var(--line); background:#fff; font-size:15px; color:var(--ink); border-radius:2px;
+  }
+  select:focus, .filebtn:focus-within, input[type=text]:focus{ outline:2px solid var(--stamp); outline-offset:1px; }
+  .filebtn{ display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; }
+  .filebtn input[type=file]{ display:none; }
+  .filename{ color:var(--ink-soft); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .choose{ flex:none; font-size:13px; font-weight:600; color:var(--stamp-dark); }
+
+  .stepper{ display:flex; align-items:center; gap:14px; }
+  .stepper button{ width:38px; height:38px; border:1px solid var(--line); background:#fff; font-size:18px; cursor:pointer; border-radius:2px; }
+  .stepper span{ min-width:24px; text-align:center; font-size:16px; }
+
+  details.options{ margin-bottom:18px; border:1px solid var(--line); border-radius:2px; padding:0 12px; }
+  details.options summary{ padding:12px 0; font-size:13px; font-weight:600; cursor:pointer; list-style:none; }
+  details.options summary::-webkit-details-marker{ display:none; }
+  details.options summary::before{ content:"+ "; color:var(--stamp-dark); }
+  details.options[open] summary::before{ content:"− "; }
+  details.options .field{ margin-bottom:14px; }
+  details.options .field:last-of-type{ margin-bottom:0; }
+  .hint{ font-weight:400; color:var(--ink-soft); font-size:11px; }
+  .checkline{ display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; }
+  .checkline input{ width:16px; height:16px; }
+  .optionsnote{ padding-bottom:14px; line-height:1.5; }
+
+  .printbtn{ width:100%; margin-top:6px; padding:15px; background:var(--stamp); color:#fff; border:none; font-size:15px; font-weight:700; letter-spacing:1.5px; cursor:pointer; border-radius:2px; }
+  .printbtn:disabled{ background:#C9A0A5; cursor:not-allowed; }
+  .status{ margin-top:14px; font-size:13px; min-height:18px; text-align:center; }
+  .status.err{ color:var(--stamp-dark); } .status.ok{ color:var(--ok); }
+
+  .jobs{ padding:20px 26px 26px; }
+  .jobs h2{ font-size:12px; letter-spacing:1px; color:var(--ink-soft); margin:0 0 12px; font-weight:600; }
+  .job{ display:flex; justify-content:space-between; gap:10px; font-family:"Courier New", monospace; font-size:13px; padding:7px 0; border-bottom:1px solid #EEF0F2; }
+  .job:last-child{ border-bottom:none; }
+  .job .name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .job .via{ color:var(--ink-soft); flex:none; }
+  .empty{ color:var(--ink-soft); font-size:13px; }
+  .footer-link{ text-align:center; padding:14px; font-size:12px; }
+  .footer-link a{ color:var(--stamp-dark); }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="ticket">
+    <div class="head">
+      <h1>LAN PRINT</h1>
+      <p>Send a file from this device to the shared printer</p>
+    </div>
+    <div class="perf"></div>
+
+    <div id="connection">
+      <div class="tabs">
+        <button type="button" id="tabLocal" class="tab active">This network</button>
+        <button type="button" id="tabRemote" class="tab">Anywhere</button>
+      </div>
+
+      <div class="spinner"></div>
+      <div id="connStatus">Looking for your printer…</div>
+      <button id="rescanBtn" type="button">Search again</button>
+
+      <form id="manualForm" class="hidden">
+        <label for="manualIp">Or enter the printer PC's address</label>
+        <div class="row">
+          <input type="text" id="manualIp" placeholder="e.g. 192.168.1.42" />
+          <button type="submit">Connect</button>
+        </div>
+        <p class="hint">Find it in the LAN Print window on the PC — it shows a QR code and this address.</p>
+      </form>
+
+      <form id="remoteForm" class="hidden">
+        <label for="relayUrlField">Relay address</label>
+        <input type="text" id="relayUrlField" placeholder="https://your-relay.onrender.com" />
+        <label for="relayIdField" style="margin-top:12px;">Pairing ID</label>
+        <input type="text" id="relayIdField" placeholder="e.g. K7QX4M" style="text-transform:uppercase;" />
+        <button type="submit" style="margin-top:14px; width:100%;">Connect</button>
+        <p class="hint">Both of these are shown in the LAN Print desktop app's "Print from anywhere" section.</p>
+      </form>
+    </div>
+
+    <div id="printSection" class="hidden">
+      <form class="form" id="printForm">
+        <div class="field">
+          <label for="printer">Printer</label>
+          <select id="printer" name="printer" required><option value="">Loading printers…</option></select>
+        </div>
+
+        <div class="field">
+          <label for="file">File</label>
+          <label class="filebtn" for="file">
+            <span class="filename" id="filename">No file chosen</span>
+            <span class="choose">Choose</span>
+          </label>
+          <input type="file" id="file" name="file" required />
+        </div>
+
+        <div class="field">
+          <label>Copies</label>
+          <div class="stepper">
+            <button type="button" id="minus">−</button>
+            <span id="copiesVal">1</span>
+            <button type="button" id="plus">+</button>
+          </div>
+        </div>
+
+        <details class="options">
+          <summary>Print options</summary>
+          <div class="field">
+            <label for="orientation">Orientation</label>
+            <select id="orientation" name="orientation">
+              <option value="portrait" selected>Portrait</option>
+              <option value="landscape">Landscape</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="paperSize">Paper size</label>
+            <select id="paperSize" name="paperSize"><option value="default" selected>Printer default</option></select>
+          </div>
+          <div class="field">
+            <label for="side">Sides</label>
+            <select id="side" name="side">
+              <option value="simplex" selected>One-sided</option>
+              <option value="duplexlong">Two-sided (flip on long edge)</option>
+              <option value="duplexshort">Two-sided (flip on short edge)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="scale">Scale</label>
+            <select id="scale" name="scale">
+              <option value="shrink" selected>Shrink oversized pages to fit</option>
+              <option value="fit">Fit to page</option>
+              <option value="noscale">Actual size</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="pages">Page range <span class="hint">(optional, e.g. 1-3,5)</span></label>
+            <input type="text" id="pages" name="pages" placeholder="All pages" />
+          </div>
+          <div class="field">
+            <label class="checkline"><input type="checkbox" id="monochrome" /> <span>Print in black &amp; white</span></label>
+          </div>
+          <p class="hint optionsnote">These apply to PDF and image files. Word/Excel/etc. print with their own app's settings.</p>
+        </details>
+
+        <button type="submit" class="printbtn" id="printBtn">PRINT</button>
+        <div class="status" id="status"></div>
+      </form>
+
+      <div class="perf"></div>
+      <div class="jobs">
+        <h2>RECENT JOBS (THIS DEVICE)</h2>
+        <div id="jobList"><p class="empty">Nothing printed yet this session.</p></div>
+      </div>
+      <p class="footer-link"><a href="#" id="changeServer">Not the right printer? Change server</a></p>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+  window.initPrintForm = function(endpoints, opts){
+    const isRemote = !!(opts && opts.remote);
+    const printerSelect = document.getElementById('printer');
+    const fileInput = document.getElementById('file');
+    const filenameLabel = document.getElementById('filename');
+    const copiesVal = document.getElementById('copiesVal');
+    const minusBtn = document.getElementById('minus');
+    const plusBtn = document.getElementById('plus');
+    const form = document.getElementById('printForm');
+    const statusEl = document.getElementById('status');
+    const printBtn = document.getElementById('printBtn');
+    const jobList = document.getElementById('jobList');
+    const orientationSelect = document.getElementById('orientation');
+    const paperSizeSelect = document.getElementById('paperSize');
+    const sideSelect = document.getElementById('side');
+    const scaleSelect = document.getElementById('scale');
+    const pagesInput = document.getElementById('pages');
+    const monochromeCheck = document.getElementById('monochrome');
+
+    let copies = 1;
+    let jobs = [];
+    let printersData = [];
+    const COMMON_PAPER_SIZES = ["A4", "letter", "legal", "A3", "A5", "tabloid"];
+
+    function refreshPaperSizeOptions(){
+      const printer = printersData.find(p => p.name === printerSelect.value);
+      const sizes = (printer && printer.paperSizes && printer.paperSizes.length) ? printer.paperSizes : COMMON_PAPER_SIZES;
+      const current = paperSizeSelect.value;
+      paperSizeSelect.innerHTML = '<option value="default">Printer default</option>' + sizes.map(s => `<option value="${s}">${s}</option>`).join('');
+      if (sizes.includes(current)) paperSizeSelect.value = current;
+    }
+
+    async function loadPrinters(){
+      try{
+        const res = await fetch(endpoints.printers);
+        const data = await res.json();
+        printersData = data.printers || [];
+        if (!printersData.length){ printerSelect.innerHTML = '<option value="">No printers found</option>'; return; }
+        printerSelect.innerHTML = printersData.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+        refreshPaperSizeOptions();
+      }catch(e){ printerSelect.innerHTML = '<option value="">Could not load printers</option>'; }
+    }
+
+    printerSelect.addEventListener('change', refreshPaperSizeOptions);
+    fileInput.addEventListener('change', () => { filenameLabel.textContent = fileInput.files[0] ? fileInput.files[0].name : 'No file chosen'; });
+    minusBtn.addEventListener('click', () => { copies = Math.max(1, copies - 1); copiesVal.textContent = copies; });
+    plusBtn.addEventListener('click', () => { copies = Math.min(50, copies + 1); copiesVal.textContent = copies; });
+
+    function renderJobs(){
+      if (!jobs.length){ jobList.innerHTML = '<p class="empty">Nothing printed yet this session.</p>'; return; }
+      jobList.innerHTML = jobs.map(j => `<div class="job"><span>${j.ok ? '✓' : '✕'}</span><span class="name">${j.name}</span><span class="via">${j.printer}</span></div>`).join('');
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      statusEl.textContent = ''; statusEl.className = 'status';
+      if (!fileInput.files[0]){ statusEl.textContent = 'Choose a file first'; statusEl.className = 'status err'; return; }
+      if (!printerSelect.value){ statusEl.textContent = 'Choose a printer first'; statusEl.className = 'status err'; return; }
+
+      const fd = new FormData();
+      fd.append('file', fileInput.files[0]);
+      fd.append('printer', printerSelect.value);
+      fd.append('copies', copies);
+      fd.append('orientation', orientationSelect.value);
+      fd.append('paperSize', paperSizeSelect.value);
+      fd.append('side', sideSelect.value);
+      fd.append('scale', scaleSelect.value);
+      fd.append('pages', pagesInput.value);
+      fd.append('monochrome', monochromeCheck.checked ? 'true' : 'false');
+
+      printBtn.disabled = true; printBtn.textContent = 'PRINTING…';
+      statusEl.textContent = isRemote ? 'Sending to your printer (may take a moment if it just woke up)…' : 'Sending to printer…';
+
+      async function attemptPrint(retriesLeft){
+        try{
+          const res = await fetch(endpoints.print, { method: 'POST', body: fd });
+          const data = await res.json();
+          if (!res.ok){
+            if (isRemote && retriesLeft > 0 && /offline/i.test(data.error || '')){
+              statusEl.textContent = 'Printer waking up, retrying…';
+              await new Promise(r => setTimeout(r, 5000));
+              return attemptPrint(retriesLeft - 1);
+            }
+            throw new Error(data.error || 'Print failed');
+          }
+          statusEl.textContent = data.note ? data.note : 'Sent to printer.';
+          statusEl.className = 'status ok';
+          jobs.unshift({ ok: true, name: fileInput.files[0].name, printer: printerSelect.value });
+        }catch(err){
+          statusEl.textContent = err.message;
+          statusEl.className = 'status err';
+          jobs.unshift({ ok: false, name: fileInput.files[0].name, printer: printerSelect.value });
+        }finally{
+          printBtn.disabled = false; printBtn.textContent = 'PRINT'; renderJobs();
+        }
+      }
+      attemptPrint(isRemote ? 2 : 0);
+    });
+
+    loadPrinters();
+  };
+</script>
+</body>
+</html>
