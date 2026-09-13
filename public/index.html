@@ -99,6 +99,13 @@
   .checkline input{ width:16px; height:16px; }
   .optionsnote{ padding-bottom:14px; line-height:1.5; }
 
+  .flipbanner{
+    margin-top:16px; padding:16px; border:1px solid var(--stamp); background:#FBEEEF; border-radius:2px;
+  }
+  .flipbanner p{ margin:0 0 12px; font-size:13px; color:var(--ink); line-height:1.5; }
+  .flipActions{ display:flex; gap:10px; align-items:center; }
+  .flipCancel{ background:none; border:none; color:var(--ink-soft); font-size:12px; cursor:pointer; text-decoration:underline; }
+
   .printbtn{ width:100%; margin-top:6px; padding:15px; background:var(--stamp); color:#fff; border:none; font-size:15px; font-weight:700; letter-spacing:1.5px; cursor:pointer; border-radius:2px; }
   .printbtn:disabled{ background:#C9A0A5; cursor:not-allowed; }
   .status{ margin-top:14px; font-size:13px; min-height:18px; text-align:center; }
@@ -197,7 +204,12 @@
               <option value="simplex" selected>One-sided</option>
               <option value="duplexlong">Two-sided (flip on long edge)</option>
               <option value="duplexshort">Two-sided (flip on short edge)</option>
+              <option value="manual" id="manualDuplexOption">Two-sided — printer can't, I'll flip pages</option>
             </select>
+          </div>
+          <div class="field hidden" id="manualDuplexNote">
+            <label class="checkline"><input type="checkbox" id="reverseEven" checked /> <span>Print the second side in reverse order</span></label>
+            <p class="hint">PDF only, one copy at a time. Most tray-fed printers need the second side reversed to come out in the right order — leave this checked unless a test run comes out backwards.</p>
           </div>
           <div class="field">
             <label for="scale">Scale</label>
@@ -219,6 +231,14 @@
 
         <button type="submit" class="printbtn" id="printBtn">PRINT</button>
         <div class="status" id="status"></div>
+
+        <div class="flipbanner hidden" id="flipBanner">
+          <p id="flipMessage"></p>
+          <div class="flipActions">
+            <button type="button" id="flipContinueBtn" class="printbtn" style="margin-top:0;">PRINT SIDE 2</button>
+            <button type="button" id="flipCancelBtn" class="flipCancel">Cancel</button>
+          </div>
+        </div>
       </form>
 
       <div class="perf"></div>
@@ -251,6 +271,24 @@
     const scaleSelect = document.getElementById('scale');
     const pagesInput = document.getElementById('pages');
     const monochromeCheck = document.getElementById('monochrome');
+    const manualDuplexNote = document.getElementById('manualDuplexNote');
+    const reverseEvenCheck = document.getElementById('reverseEven');
+    const flipBanner = document.getElementById('flipBanner');
+    const flipMessage = document.getElementById('flipMessage');
+    const flipContinueBtn = document.getElementById('flipContinueBtn');
+    const flipCancelBtn = document.getElementById('flipCancelBtn');
+
+    // Manual duplex requires being physically at the printer to flip pages,
+    // so it only makes sense in local-network mode.
+    if (isRemote) {
+      const opt = document.getElementById('manualDuplexOption');
+      if (opt) opt.remove();
+    }
+    let pendingJobId = null;
+
+    sideSelect.addEventListener('change', () => {
+      manualDuplexNote.classList.toggle('hidden', sideSelect.value !== 'manual');
+    });
 
     let copies = 1;
     let jobs = [];
@@ -318,6 +356,16 @@
             }
             throw new Error(data.error || 'Print failed');
           }
+
+          if (data.method === 'manual-duplex' && data.phase === 1){
+            pendingJobId = data.jobId;
+            statusEl.textContent = '';
+            flipMessage.textContent = `Printed ${data.oddCount} page(s) (side 1). Take the stack, flip it over, and reload it in the tray — then print the remaining ${data.evenCount} page(s).`;
+            flipBanner.classList.remove('hidden');
+            printBtn.disabled = true;
+            return;
+          }
+
           statusEl.textContent = data.note ? data.note : 'Sent to printer.';
           statusEl.className = 'status ok';
           jobs.unshift({ ok: true, name: fileInput.files[0].name, printer: printerSelect.value });
@@ -326,10 +374,54 @@
           statusEl.className = 'status err';
           jobs.unshift({ ok: false, name: fileInput.files[0].name, printer: printerSelect.value });
         }finally{
-          printBtn.disabled = false; printBtn.textContent = 'PRINT'; renderJobs();
+          printBtn.textContent = 'PRINT'; renderJobs();
+          if (!flipBanner.classList.contains('hidden')) return;
+          printBtn.disabled = false;
         }
       }
       attemptPrint(isRemote ? 2 : 0);
+    });
+
+    function manualDuplexEndpoint(jobId, action){
+      return endpoints.print.replace('/api/print', `/api/print-manual/${jobId}/${action}`);
+    }
+
+    flipContinueBtn.addEventListener('click', async () => {
+      if (!pendingJobId) return;
+      flipContinueBtn.disabled = true;
+      flipContinueBtn.textContent = 'PRINTING…';
+      try{
+        const res = await fetch(manualDuplexEndpoint(pendingJobId, 'continue'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reverseEven: reverseEvenCheck.checked ? 'true' : 'false' }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Print failed');
+        statusEl.textContent = `Printed the remaining ${data.evenCount} page(s). Both sides done.`;
+        statusEl.className = 'status ok';
+        jobs.unshift({ ok: true, name: fileInput.files[0].name + ' (side 2)', printer: printerSelect.value });
+      }catch(err){
+        statusEl.textContent = err.message;
+        statusEl.className = 'status err';
+      }finally{
+        flipBanner.classList.add('hidden');
+        flipContinueBtn.disabled = false;
+        flipContinueBtn.textContent = 'PRINT SIDE 2';
+        pendingJobId = null;
+        printBtn.disabled = false;
+        renderJobs();
+      }
+    });
+
+    flipCancelBtn.addEventListener('click', async () => {
+      if (!pendingJobId) return;
+      try{ await fetch(manualDuplexEndpoint(pendingJobId, 'cancel'), { method: 'POST' }); } catch(e){}
+      flipBanner.classList.add('hidden');
+      pendingJobId = null;
+      printBtn.disabled = false;
+      statusEl.textContent = 'Cancelled — side 2 was not printed.';
+      statusEl.className = 'status';
     });
 
     loadPrinters();
