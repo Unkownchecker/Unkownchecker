@@ -25,6 +25,20 @@ using a short pairing ID.
    That's your relay's address — you'll paste it into both the desktop app
    and the phone app, once.
 
+## Using the relay's own URL as your phone app
+
+This relay also serves the same LAN Print web app at its own address. Add
+the relay's URL itself to your phone's home screen instead of (or alongside)
+the local printer PC's address — since it's HTTPS, it will always open, on
+any network. Inside it, the "This network" tab is automatically hidden (it
+can't reach a plain-HTTP local printer from an HTTPS page — browsers block
+that), so it goes straight to the "Anywhere" tab using your pairing ID.
+
+If you also want quick local-network printing without going through the
+relay at all, keep a separate home-screen icon pointing at the printer PC's
+local address (shown in the desktop app) — that one still uses the faster,
+relay-free "This network" flow.
+
 ## Important limitation of the free tier
 
 Render's free web services **go to sleep after 15 minutes with no traffic**

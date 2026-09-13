@@ -111,6 +111,30 @@ app.post("/relay/:id/print", upload.single("file"), async (req, res) => {
   }
 });
 
+// Manual duplex, phase 2: printed after whoever's at the printer flips the stack.
+app.post("/relay/:id/print-manual/:jobId/continue", async (req, res) => {
+  try {
+    const result = await rpc(req.params.id, {
+      type: "continue_manual",
+      jobId: req.params.jobId,
+      reverseEven: req.body.reverseEven,
+    });
+    if (!result.ok) return res.status(400).json({ error: result.error || "Print failed" });
+    res.json(result);
+  } catch (err) {
+    res.status(err.message === "offline" ? 404 : 504).json({ error: err.message === "timeout" ? "Printer didn't respond in time" : err.message });
+  }
+});
+
+app.post("/relay/:id/print-manual/:jobId/cancel", async (req, res) => {
+  try {
+    const result = await rpc(req.params.id, { type: "cancel_manual", jobId: req.params.jobId });
+    res.json(result);
+  } catch (err) {
+    res.status(err.message === "offline" ? 404 : 504).json({ error: err.message });
+  }
+});
+
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 
@@ -128,7 +152,7 @@ wss.on("connection", (ws) => {
       return;
     }
 
-    if (msg.type === "printers_result" || msg.type === "print_result") {
+    if (msg.type && msg.type.endsWith("_result")) {
       const p = pending.get(msg.requestId);
       if (p) {
         clearTimeout(p.timer);
