@@ -65,6 +65,8 @@ function rpc(deviceId, message, timeoutMs = RPC_TIMEOUT_MS) {
   });
 }
 
+app.get("/health", (req, res) => res.json({ ok: true, time: Date.now() }));
+
 app.get("/relay/:id/status", (req, res) => {
   const device = devices.get(req.params.id);
   res.json({ online: !!device });
