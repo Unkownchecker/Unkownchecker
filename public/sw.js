@@ -25,11 +25,18 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  // Only ever intercept simple GET requests for the cached app shell.
+  // File uploads (print jobs) are POST requests with a body — trying to
+  // route those through caches.match()/fetch() here can cause the request
+  // to be sent twice in some browsers, which is exactly wrong for a print
+  // job. Let the browser handle anything that isn't a plain GET itself.
+  if (event.request.method !== "GET") return;
+
   const url = new URL(event.request.url);
 
   // Never cache API calls — those must always hit the live server (which
   // might be on a different origin than the one that served this cached shell).
-  if (url.pathname.startsWith("/api/")) return;
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/relay/")) return;
 
   // Cross-origin requests (the app calling a discovered server IP) — just
   // pass through to the network, don't try to cache-match them.

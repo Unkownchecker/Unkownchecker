@@ -17,6 +17,7 @@ const { WebSocketServer } = require("ws");
 const http = require("http");
 const path = require("path");
 const crypto = require("crypto");
+const { prepareDocumentForPrinter } = require("./prepare-pdf");
 
 const PORT = process.env.PORT || 10000;
 const MAX_FILE_MB = 20;
@@ -31,6 +32,38 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json());
+
+// In-memory rate limiter for relay status and RPC endpoints to prevent brute-forcing pairing IDs
+const requestCounts = new Map();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const MAX_REQUESTS_PER_WINDOW = 60;
+
+function rateLimiter(req, res, next) {
+  const ip = req.ip || req.connection.remoteAddress || "unknown";
+  const now = Date.now();
+  let record = requestCounts.get(ip);
+  if (!record || now - record.startTime > RATE_LIMIT_WINDOW_MS) {
+    record = { startTime: now, count: 0 };
+    requestCounts.set(ip, record);
+  }
+  record.count++;
+  if (record.count > MAX_REQUESTS_PER_WINDOW) {
+    return res.status(429).json({ error: "Too many requests, please slow down." });
+  }
+  next();
+}
+
+app.use("/relay", rateLimiter);
+
+// Cleanup expired rate limit entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of requestCounts.entries()) {
+    if (now - record.startTime > RATE_LIMIT_WINDOW_MS) {
+      requestCounts.delete(ip);
+    }
+  }
+}, 5 * 60 * 1000);
 
 // Serve the same app shell used locally, so this relay's own URL is
 // something you can add to a phone's home screen and have it always open
@@ -87,17 +120,40 @@ app.post("/relay/:id/print", upload.single("file"), async (req, res) => {
   if (!devices.has(req.params.id)) return res.status(404).json({ error: "offline" });
 
   try {
+    let fileBuffer = req.file.buffer;
+    let filename = req.file.originalname;
+
+    const isFirmware =
+      req.body.isFirmware === true ||
+      req.body.isFirmware === "true" ||
+      /\.(img|dl)$/i.test(filename);
+
+    if (!isFirmware) {
+      const prepared = await prepareDocumentForPrinter(fileBuffer, filename, {
+        orientation: req.body.orientation,
+        paperSize: req.body.paperSize,
+      });
+      if (prepared && prepared.buffer) {
+        fileBuffer = prepared.buffer;
+        filename = prepared.filename || filename;
+      }
+    }
+
     const result = await rpc(
       req.params.id,
       {
         type: "print",
-        filename: req.file.originalname,
-        fileBase64: req.file.buffer.toString("base64"),
+        filename: filename,
+        fileBase64: fileBuffer.toString("base64"),
         options: {
           printer: req.body.printer,
           copies: req.body.copies,
-          orientation: req.body.orientation,
-          paperSize: req.body.paperSize,
+          // Always send 'portrait' to Android host because the document has already
+          // been pre-oriented and sized to [1190.35, 841.89] (the exact 1200x600 drum geometry).
+          // Sending 'portrait' ensures the Android APK rasterizer preserves targetW=9920, targetH=7016
+          // matching -g9920x7016 without squashing or orientation mismatch.
+          orientation: "portrait",
+          paperSize: req.body.paperSize || "a4",
           side: req.body.side,
           scale: req.body.scale,
           pages: req.body.pages,
@@ -107,6 +163,26 @@ app.post("/relay/:id/print", upload.single("file"), async (req, res) => {
       30000
     );
     if (!result.ok) return res.status(500).json({ error: result.error || "Print failed" });
+    res.json(result);
+  } catch (err) {
+    res.status(err.message === "offline" ? 404 : 504).json({ error: err.message === "timeout" ? "Printer didn't respond in time" : err.message });
+  }
+});
+
+app.post("/relay/:id/firmware", upload.single("file"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  if (!devices.has(req.params.id)) return res.status(404).json({ error: "offline" });
+
+  try {
+    const result = await rpc(
+      req.params.id,
+      {
+        type: "upload_firmware",
+        filename: req.file.originalname,
+        fileBase64: req.file.buffer.toString("base64"),
+      },
+      30000
+    );
     res.json(result);
   } catch (err) {
     res.status(err.message === "offline" ? 404 : 504).json({ error: err.message === "timeout" ? "Printer didn't respond in time" : err.message });
@@ -138,10 +214,16 @@ app.post("/relay/:id/print-manual/:jobId/cancel", async (req, res) => {
 });
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: "/ws" });
+const wss = new WebSocketServer({
+  server,
+  path: "/ws",
+  maxPayload: 35 * 1024 * 1024, // 35MB max to allow base64 file payloads for ~20MB documents
+});
 
 wss.on("connection", (ws) => {
   let registeredId = null;
+  ws.isAlive = true;
+  ws.on("pong", () => { ws.isAlive = true; });
 
   ws.on("message", (raw) => {
     let msg;
@@ -154,6 +236,11 @@ wss.on("connection", (ws) => {
       return;
     }
 
+    if (msg.type === "app_ping") {
+      send(ws, { type: "app_pong" });
+      return;
+    }
+
     if (msg.type && msg.type.endsWith("_result")) {
       const p = pending.get(msg.requestId);
       if (p) {
@@ -163,11 +250,6 @@ wss.on("connection", (ws) => {
       }
       return;
     }
-
-    if (msg.type === "pong") {
-      const device = devices.get(registeredId);
-      if (device) device.lastSeen = Date.now();
-    }
   });
 
   ws.on("close", () => {
@@ -176,6 +258,20 @@ wss.on("connection", (ws) => {
     }
   });
 });
+
+// Proxies and idle connections can die without a clean close frame. Ping
+// every connected client periodically and drop anyone who doesn't answer —
+// this both keeps registrations accurate and helps keep the underlying
+// connection from being reaped as idle.
+const heartbeatInterval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) return ws.terminate();
+    ws.isAlive = false;
+    try { ws.ping(); } catch {}
+  });
+}, 20000);
+
+wss.on("close", () => clearInterval(heartbeatInterval));
 
 server.listen(PORT, () => {
   console.log(`LAN Print relay listening on port ${PORT}`);

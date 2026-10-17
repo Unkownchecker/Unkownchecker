@@ -190,7 +190,8 @@
           <div class="field">
             <label for="orientation">Orientation</label>
             <select id="orientation" name="orientation">
-              <option value="portrait" selected>Portrait</option>
+              <option value="auto" selected>Auto (match document)</option>
+              <option value="portrait">Portrait</option>
               <option value="landscape">Landscape</option>
             </select>
           </div>
@@ -254,6 +255,14 @@
 <script src="/app.js"></script>
 <script>
   window.initPrintForm = function(endpoints, opts){
+    // Defensive guard: if this ever gets called a second time for the same
+    // page load (e.g. a reconnect re-running the connect flow), don't
+    // attach a second set of event listeners to the same form — that would
+    // cause every print to fire twice.
+    const form = document.getElementById('printForm');
+    if (form.dataset.initialized === 'true') return;
+    form.dataset.initialized = 'true';
+
     const isRemote = !!(opts && opts.remote);
     const printerSelect = document.getElementById('printer');
     const fileInput = document.getElementById('file');
@@ -261,7 +270,6 @@
     const copiesVal = document.getElementById('copiesVal');
     const minusBtn = document.getElementById('minus');
     const plusBtn = document.getElementById('plus');
-    const form = document.getElementById('printForm');
     const statusEl = document.getElementById('status');
     const printBtn = document.getElementById('printBtn');
     const jobList = document.getElementById('jobList');
@@ -297,13 +305,17 @@
       if (sizes.includes(current)) paperSizeSelect.value = current;
     }
 
+    function escapeHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
     async function loadPrinters(){
       try{
         const res = await fetch(endpoints.printers);
         const data = await res.json();
         printersData = data.printers || [];
         if (!printersData.length){ printerSelect.innerHTML = '<option value="">No printers found</option>'; return; }
-        printerSelect.innerHTML = printersData.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+        printerSelect.innerHTML = printersData.map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('');
         refreshPaperSizeOptions();
       }catch(e){ printerSelect.innerHTML = '<option value="">Could not load printers</option>'; }
     }
@@ -315,7 +327,7 @@
 
     function renderJobs(){
       if (!jobs.length){ jobList.innerHTML = '<p class="empty">Nothing printed yet this session.</p>'; return; }
-      jobList.innerHTML = jobs.map(j => `<div class="job"><span>${j.ok ? '✓' : '✕'}</span><span class="name">${j.name}</span><span class="via">${j.printer}</span></div>`).join('');
+      jobList.innerHTML = jobs.map(j => `<div class="job"><span>${j.ok ? '✓' : '✕'}</span><span class="name">${escapeHtml(j.name)}</span><span class="via">${escapeHtml(j.printer)}</span></div>`).join('');
     }
 
     form.addEventListener('submit', async (e) => {
