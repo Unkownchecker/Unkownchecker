@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>HP Printer Firmware Downloads — PrintBridge Pro</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #0b0f19;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+    }
+    .container {
+      width: 100%;
+      max-width: 480px;
+      background: #111827;
+      border: 1px solid #1f293d;
+      border-radius: 16px;
+      padding: 24px 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #38bdf8;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    p.sub {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 20px;
+      line-height: 1.4;
+    }
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #f8fafc;
+      margin-bottom: 4px;
+    }
+    .card-desc {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 12px;
+    }
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 12px 16px;
+      background: #0284c7;
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .btn:hover, .btn:active {
+      background: #0369a1;
+    }
+    .guide {
+      margin-top: 24px;
+      border-top: 1px dashed #334155;
+      padding-top: 18px;
+    }
+    .guide h2 {
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #38bdf8;
+      margin-bottom: 10px;
+    }
+    ol {
+      padding-left: 20px;
+      font-size: 13px;
+      color: #cbd5e1;
+      line-height: 1.6;
+    }
+    ol li { margin-bottom: 6px; }
+    .back-link {
+      display: block;
+      margin-top: 20px;
+      text-align: center;
+      font-size: 13px;
+      color: #38bdf8;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🖨️ HP Firmware Files</h1>
+    <p class="sub">Fully converted HP download files (.dl) ready to flash from Android without needing a PC.</p>
+
+    <!-- HP 1020 / 1020 Plus -->
+    <div class="card">
+      <div class="card-title">HP LaserJet 1020 &amp; 1020 Plus</div>
+      <div class="card-desc">Filename: <code>sihp1020.dl</code> • Size: 128 KB</div>
+      <a href="/firmware/sihp1020.dl" download="sihp1020.dl" class="btn">
+        ⬇ Download sihp1020.dl
+      </a>
+    </div>
+
+    <!-- HP P1007 -->
+    <div class="card">
+      <div class="card-title">HP LaserJet P1007</div>
+      <div class="card-desc">Filename: <code>sihpP1007.dl</code> • Size: 223 KB</div>
+      <a href="/firmware/sihpP1007.dl" download="sihpP1007.dl" class="btn">
+        ⬇ Download sihpP1007.dl
+      </a>
+    </div>
+
+    <!-- HP P1005 / P1006 -->
+    <div class="card">
+      <div class="card-title">HP LaserJet P1005 / P1006</div>
+      <div class="card-desc">Filename: <code>sihpP1005.dl</code> • Size: 223 KB</div>
+      <a href="/firmware/sihpP1005.dl" download="sihpP1005.dl" class="btn" style="background:#334155;">
+        ⬇ Download sihpP1005.dl
+      </a>
+    </div>
+
+    <div class="guide">
+      <h2>How to load from Android:</h2>
+      <ol>
+        <li>Tap the download button above to save the <code>.dl</code> file on your phone.</li>
+        <li>Connect your HP printer to your Android phone with a USB OTG cable and turn it ON.</li>
+        <li>Open the <strong>PrintBridge Pro</strong> app.</li>
+        <li>Tap <strong>"Load Firmware"</strong> and select the downloaded <code>.dl</code> file.</li>
+        <li>The printer will initialize immediately, and the app permanently saves the firmware!</li>
+      </ol>
+    </div>
+
+    <a href="/" class="back-link">← Back to LAN Print</a>
+  </div>
+</body>
+</html>

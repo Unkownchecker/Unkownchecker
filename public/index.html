@@ -128,6 +128,11 @@
     <div class="head">
       <h1>LAN PRINT</h1>
       <p>Send a file from this device to the shared printer</p>
+      <div style="margin-top:10px;">
+        <a href="/firmware" style="display:inline-block; font-size:12px; padding:5px 12px; background:#1b2332; color:#5eead4; border:1px solid #2e3d54; border-radius:6px; text-decoration:none; font-weight:bold;">
+          ⬇ HP Printer Firmware Files (.dl)
+        </a>
+      </div>
     </div>
     <div class="perf"></div>
 
@@ -247,19 +252,24 @@
         <h2>RECENT JOBS (THIS DEVICE)</h2>
         <div id="jobList"><p class="empty">Nothing printed yet this session.</p></div>
       </div>
-      <div class="jobs" style="margin-top:20px;">
-        <h2>PRINTER FIRMWARE DOWNLOADS (FOR ANDROID)</h2>
-        <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
-          <a href="/firmware/sihp1020.dl" download="sihp1020.dl" style="display:inline-block; padding:10px 14px; background:#1b2332; color:#5eead4; border:1px solid #2e3d54; border-radius:8px; text-decoration:none; font-weight:600; text-align:center;">
-            ⬇ Download HP LaserJet 1020 / 1020 Plus Firmware (.dl)
-          </a>
-          <a href="/firmware/sihpP1007.dl" download="sihpP1007.dl" style="display:inline-block; padding:10px 14px; background:#1b2332; color:#5eead4; border:1px solid #2e3d54; border-radius:8px; text-decoration:none; font-weight:600; text-align:center;">
-            ⬇ Download HP LaserJet P1007 Firmware (.dl)
-          </a>
-        </div>
-        <p class="hint" style="margin-top:8px;">Download directly to your Android phone, then open PrintBridge Pro &gt; tap "Load Firmware" &gt; select this file.</p>
-      </div>
       <p class="footer-link"><a href="#" id="changeServer">Not the right printer? Change server</a></p>
+    </div>
+
+    <!-- ALWAYS VISIBLE FIRMWARE DOWNLOADS FOR ANDROID -->
+    <div class="perf" style="margin-top:16px;"></div>
+    <div style="padding:16px 20px 20px;">
+      <h2 style="font-size:12px; letter-spacing:1px; color:#8892b0; margin-bottom:10px; text-transform:uppercase;">
+        ⬇ HP Printer Firmware (.dl) for Android
+      </h2>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <a href="/firmware/sihp1020.dl" download="sihp1020.dl" style="display:block; padding:10px 14px; background:#1b2332; color:#5eead4; border:1px solid #2e3d54; border-radius:8px; text-decoration:none; font-weight:600; text-align:center; font-size:13px;">
+          ⬇ Download HP LaserJet 1020 / 1020 Plus Firmware (.dl)
+        </a>
+        <a href="/firmware/sihpP1007.dl" download="sihpP1007.dl" style="display:block; padding:10px 14px; background:#1b2332; color:#5eead4; border:1px solid #2e3d54; border-radius:8px; text-decoration:none; font-weight:600; text-align:center; font-size:13px;">
+          ⬇ Download HP LaserJet P1007 Firmware (.dl)
+        </a>
+      </div>
+      <p class="hint" style="margin-top:8px; text-align:center;">Download to your phone, then open PrintBridge Pro &gt; tap "Load Firmware" &gt; select this file.</p>
     </div>
   </div>
 </div>

@@ -1,4 +1,4 @@
-const CACHE_NAME = "lan-print-shell-v1";
+const CACHE_NAME = "lan-print-shell-v2";
 const SHELL_FILES = [
   "/",
   "/index.html",
@@ -34,9 +34,8 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(event.request.url);
 
-  // Never cache API calls — those must always hit the live server (which
-  // might be on a different origin than the one that served this cached shell).
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/relay/")) return;
+  // Never cache API calls or firmware downloads — those must always hit the live server
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/relay/") || url.pathname.startsWith("/firmware")) return;
 
   // Cross-origin requests (the app calling a discovered server IP) — just
   // pass through to the network, don't try to cache-match them.
