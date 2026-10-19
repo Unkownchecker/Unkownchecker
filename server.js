@@ -99,6 +99,7 @@ function rpc(deviceId, message, timeoutMs = RPC_TIMEOUT_MS) {
 }
 
 app.get("/health", (req, res) => res.json({ ok: true, time: Date.now() }));
+app.get("/firmware", (req, res) => res.redirect("/firmware/"));
 
 app.get("/relay/:id/status", (req, res) => {
   const device = devices.get(req.params.id);
