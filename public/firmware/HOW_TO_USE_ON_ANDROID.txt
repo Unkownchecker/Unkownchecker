@@ -1,0 +1,48 @@
+================================================================================
+ READY CONVERTED FIRMWARE FILES FOR ANDROID (ZERO PC REQUIRED)
+================================================================================
+
+These files are fully converted HP download (.dl) binary streams.
+They already contain the PJL/ACL printer header and are 100% ready to be
+accepted directly by the printer over USB.
+
+--------------------------------------------------------------------------------
+1. WHICH FILE TO USE:
+--------------------------------------------------------------------------------
+- For HP LaserJet 1020 / 1020 Plus:
+  --> Use: sihp1020.dl  (or firmware-1020.dl)
+  (Size: 128,862 bytes)
+
+- For HP LaserJet P1007:
+  --> Use: sihpP1007.dl (or firmware-P1005.dl)
+  (Size: 223,529 bytes)
+
+- For HP LaserJet P1005 / P1006:
+  --> Use: sihpP1005.dl / sihpP1006.dl
+
+--------------------------------------------------------------------------------
+2. HOW TO LOAD INTO THE ANDROID APP (PrintBridge Pro):
+--------------------------------------------------------------------------------
+1. Copy or download the .dl file onto your Android phone (e.g. into your phone's
+   "Download" folder).
+2. Connect your HP printer to the Android phone using a USB OTG cable.
+3. Turn on the printer.
+4. Open the PrintBridge Pro app on the phone.
+5. Tap the "Load Firmware" button.
+6. Select the .dl file (e.g., sihp1020.dl for HP 1020 Plus).
+7. The app sends the firmware to the printer immediately!
+   You will hear the printer's rollers whir and initialize.
+8. The app permanently saves the firmware in its internal storage!
+   Next time you plug in the printer or open the app, it will automatically
+   recognize the printer and send the firmware itself.
+
+--------------------------------------------------------------------------------
+3. DOWNLOADING DIRECTLY ON PHONE WITHOUT A PC:
+--------------------------------------------------------------------------------
+You can open this URL in your Android phone's web browser:
+  https://printer-p35v.onrender.com/firmware/sihp1020.dl
+  https://printer-p35v.onrender.com/firmware/sihpP1007.dl
+
+Or download directly from your GitHub repository:
+  https://github.com/Unkownchecker/Unkownchecker/tree/main/public/firmware
+================================================================================
