@@ -223,8 +223,8 @@ const wss = new WebSocketServer({
 
 wss.on("connection", (ws) => {
   let registeredId = null;
-  ws.isAlive = true;
-  ws.on("pong", () => { ws.isAlive = true; });
+  ws.missedPings = 0;
+  ws.on("pong", () => { ws.missedPings = 0; });
 
   ws.on("message", (raw) => {
     let msg;
@@ -232,12 +232,18 @@ wss.on("connection", (ws) => {
 
     if (msg.type === "register" && msg.id) {
       registeredId = msg.id;
+      // If there was an existing connection for this ID, close it cleanly
+      const existing = devices.get(registeredId);
+      if (existing && existing.ws !== ws) {
+        try { existing.ws.terminate(); } catch {}
+      }
       devices.set(registeredId, { ws, lastSeen: Date.now() });
       send(ws, { type: "registered", id: registeredId });
       return;
     }
 
     if (msg.type === "app_ping") {
+      ws.missedPings = 0;
       send(ws, { type: "app_pong" });
       return;
     }
@@ -261,18 +267,29 @@ wss.on("connection", (ws) => {
 });
 
 // Proxies and idle connections can die without a clean close frame. Ping
-// every connected client periodically and drop anyone who doesn't answer —
-// this both keeps registrations accurate and helps keep the underlying
-// connection from being reaped as idle.
+// every connected client periodically. Allow 2 missed intervals (40-60s) before
+// terminating to accommodate mobile network jitter.
 const heartbeatInterval = setInterval(() => {
   wss.clients.forEach((ws) => {
-    if (ws.isAlive === false) return ws.terminate();
-    ws.isAlive = false;
+    if (ws.missedPings >= 2) {
+      return ws.terminate();
+    }
+    ws.missedPings = (ws.missedPings || 0) + 1;
     try { ws.ping(); } catch {}
   });
 }, 20000);
 
 wss.on("close", () => clearInterval(heartbeatInterval));
+
+// Keep Render free instance awake 24/7 by pinging /health every 10 minutes (Render sleeps at 15m)
+const RENDER_PING_INTERVAL_MS = 10 * 60 * 1000;
+setInterval(() => {
+  const url = process.env.RENDER_EXTERNAL_URL || "https://printer-p35v.onrender.com";
+  try {
+    const httpLib = url.startsWith("https") ? require("https") : require("http");
+    httpLib.get(`${url}/health`, () => {}).on("error", () => {});
+  } catch {}
+}, RENDER_PING_INTERVAL_MS);
 
 server.listen(PORT, () => {
   console.log(`LAN Print relay listening on port ${PORT}`);
