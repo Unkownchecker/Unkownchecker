@@ -97,11 +97,26 @@ async function discoverLocalServer(onStatus) {
 }
 
 // ---- Remote (anywhere) mode, via relay + pairing ID ----
+function normalizeUrl(rawUrl) {
+  let url = (rawUrl || "").trim().replace(/\/+$/, "");
+  if (!url) return "";
+  if (!/^https?:\/\//i.test(url)) {
+    url = (location.protocol === "http:" ? "http://" : "https://") + url;
+  }
+  return url;
+}
+
 async function checkRemote(relayUrl, id) {
-  const url = relayUrl.replace(/\/+$/, "");
-  const res = await withTimeout(fetch(`${url}/relay/${id}/status`, { cache: "no-store" }), 60000);
+  const url = normalizeUrl(relayUrl);
+  const cleanId = (id || "").trim().toUpperCase();
+  const res = await withTimeout(fetch(`${url}/relay/${cleanId}/status`, { cache: "no-store" }), 20000);
+  if (!res.ok) {
+    if (res.status === 404) throw new Error("Printer device offline (check Pairing ID and ensure app is Running)");
+    if (res.status === 429) throw new Error("Too many requests — please wait a moment");
+    throw new Error(`Server returned error ${res.status}`);
+  }
   const data = await res.json();
-  if (!data.online) throw new Error("Printer is offline (or the relay is waking up — try again in a few seconds)");
+  if (!data.online) throw new Error("Printer host is offline (ensure PrintBridge Pro is running on the host phone)");
   return url;
 }
 
@@ -122,6 +137,21 @@ document.addEventListener("DOMContentLoaded", () => {
   const remoteForm = document.getElementById("remoteForm");
   const relayUrlInput = document.getElementById("relayUrlField");
   const relayIdInput = document.getElementById("relayIdField");
+
+  const params = new URLSearchParams(location.search);
+  const hashId = (location.hash || "").replace(/^#/, "").trim().toUpperCase();
+  const queryId = (params.get("id") || params.get("pairing") || hashId || "").trim().toUpperCase();
+  const queryRelay = (params.get("relay") || params.get("server") || "").trim();
+
+  let defaultOrigin = "";
+  try {
+    if (location.origin && location.origin !== "null" && !location.origin.startsWith("file:")) {
+      defaultOrigin = location.origin;
+    }
+  } catch {}
+  if (!defaultOrigin) {
+    defaultOrigin = "https://printer-p35v.onrender.com";
+  }
 
   let mode = localStorage.getItem(MODE_KEY) || "local";
 
@@ -167,15 +197,31 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function connectRemote(relayUrl, id) {
+    const cleanUrl = normalizeUrl(relayUrl) || defaultOrigin;
+    const cleanId = (id || "").trim().toUpperCase();
+    if (!cleanId) {
+      if (spinner) spinner.classList.add("hidden");
+      connStatus.textContent = "Please enter your pairing ID.";
+      remoteForm.classList.remove("hidden");
+      return;
+    }
+
     setTabs();
-    showConnecting("Connecting to your printer…");
+    showConnecting(`Connecting to printer [${cleanId}]…`);
     try {
-      const base = await checkRemote(relayUrl, id);
-      localStorage.setItem(RELAY_URL_KEY, relayUrl);
-      localStorage.setItem(RELAY_ID_KEY, id);
+      const base = await checkRemote(cleanUrl, cleanId);
+      localStorage.setItem(RELAY_URL_KEY, cleanUrl);
+      localStorage.setItem(RELAY_ID_KEY, cleanId);
       connEl.classList.add("hidden");
       printSection.classList.remove("hidden");
-      window.initPrintForm({ printers: `${base}/relay/${id}/printers`, print: `${base}/relay/${id}/print` }, { remote: true });
+      window.initPrintForm(
+        {
+          printers: `${base}/relay/${cleanId}/printers`,
+          print: `${base}/relay/${cleanId}/print`,
+          telemetry: `${base}/relay/${cleanId}/telemetry`,
+        },
+        { remote: true, pairingId: cleanId, relayUrl: base }
+      );
     } catch (err) {
       if (spinner) spinner.classList.add("hidden");
       connStatus.textContent = err.message || "Couldn't connect.";
@@ -190,16 +236,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (mode === "local") {
       connectLocal();
     } else {
-      const savedUrl = localStorage.getItem(RELAY_URL_KEY);
-      const savedId = localStorage.getItem(RELAY_ID_KEY);
-      if (savedUrl && savedId) {
-        connectRemote(savedUrl, savedId);
+      const activeUrl = queryRelay || localStorage.getItem(RELAY_URL_KEY) || defaultOrigin;
+      const activeId = queryId || localStorage.getItem(RELAY_ID_KEY);
+      if (activeUrl && activeId) {
+        connectRemote(activeUrl, activeId);
       } else {
         setTabs();
         if (spinner) spinner.classList.add("hidden");
         connEl.classList.remove("hidden");
         printSection.classList.add("hidden");
-        connStatus.textContent = "Enter your relay address and pairing ID";
+        connStatus.textContent = "Enter your pairing ID to connect";
         remoteForm.classList.remove("hidden");
         rescanBtn.classList.add("hidden");
       }
@@ -227,9 +273,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   remoteForm.addEventListener("submit", (e) => {
     e.preventDefault();
-    const url = relayUrlInput.value.trim();
+    const rawUrl = relayUrlInput.value.trim() || defaultOrigin;
+    const url = normalizeUrl(rawUrl);
     const id = relayIdInput.value.trim().toUpperCase();
-    if (!url || !id) return;
+    if (!id) {
+      connStatus.textContent = "Please enter your pairing ID.";
+      return;
+    }
+    relayUrlInput.value = url;
     connectRemote(url, id);
   });
 
@@ -242,10 +293,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Prefill remote form with anything remembered, for convenience when re-editing.
-  const savedUrl = localStorage.getItem(RELAY_URL_KEY);
-  const savedId = localStorage.getItem(RELAY_ID_KEY);
-  if (savedUrl) relayUrlInput.value = savedUrl;
-  if (savedId) relayIdInput.value = savedId;
+  const initialUrl = queryRelay || localStorage.getItem(RELAY_URL_KEY) || defaultOrigin;
+  const initialId = queryId || localStorage.getItem(RELAY_ID_KEY) || "";
+  if (initialUrl) relayUrlInput.value = initialUrl;
+  if (initialId) relayIdInput.value = initialId;
 
   startMode(mode);
 });

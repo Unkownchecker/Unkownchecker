@@ -132,8 +132,8 @@
         <a href="/firmware" style="display:inline-block; font-size:12px; padding:5px 12px; background:#1b2332; color:#5eead4; border:1px solid #2e3d54; border-radius:6px; text-decoration:none; font-weight:bold;">
           ⬇ HP Firmware (.dl)
         </a>
-        <a href="/apk/PrintBridge_Pro_SPEED_TEST.apk" download="PrintBridge_Pro_SPEED_TEST.apk" style="display:inline-block; font-size:12px; padding:5px 12px; background:#0e3a2f; color:#34d399; border:1px solid #059669; border-radius:6px; text-decoration:none; font-weight:bold;">
-          📱 Download APK (v2.1)
+        <a href="/apk/PrintBridge_Pro_2.2v_SPEED_AND_PORTRAIT.apk" download="PrintBridge_Pro_SPEED_TEST.apk" style="display:inline-block; font-size:12px; padding:5px 12px; background:#0e3a2f; color:#34d399; border:1px solid #059669; border-radius:6px; text-decoration:none; font-weight:bold;">
+          📱 Download APK (v2.2)
         </a>
       </div>
     </div>
@@ -171,7 +171,10 @@
     <div id="printSection" class="hidden">
       <form class="form" id="printForm">
         <div class="field">
-          <label for="printer">Printer</label>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <label for="printer" style="margin-bottom:0;">Printer</label>
+            <button type="button" id="refreshPrintersBtn" style="background:none; border:none; color:var(--stamp-dark); font-size:12px; font-weight:600; cursor:pointer; padding:0;">🔄 Reload printers</button>
+          </div>
           <select id="printer" name="printer" required><option value="">Loading printers…</option></select>
         </div>
 
@@ -252,8 +255,11 @@
 
       <div class="perf"></div>
       <div class="jobs">
-        <h2>RECENT JOBS (THIS DEVICE)</h2>
-        <div id="jobList"><p class="empty">Nothing printed yet this session.</p></div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h2 style="margin:0;">RECENT SERVER JOBS</h2>
+          <button type="button" id="refreshJobsBtn" style="background:none; border:none; color:var(--stamp-dark); font-size:12px; font-weight:600; cursor:pointer; padding:0;">🔄 Refresh</button>
+        </div>
+        <div id="jobList"><p class="empty">Loading recent jobs…</p></div>
       </div>
       <p class="footer-link"><a href="#" id="changeServer">Not the right printer? Change server</a></p>
     </div>
@@ -262,11 +268,11 @@
     <div class="perf" style="margin-top:16px;"></div>
     <div style="padding:16px 20px 20px;">
       <h2 style="font-size:12px; letter-spacing:1px; color:#8892b0; margin-bottom:10px; text-transform:uppercase;">
-        📱 PrintBridge Pro App (Auto-Reconnect Update)
+        📱 PrintBridge Pro App (Speed & Portrait Update)
       </h2>
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
-        <a href="/apk/PrintBridge_Pro_SPEED_TEST.apk" download="PrintBridge_Pro_SPEED_TEST.apk" style="display:block; padding:10px 14px; background:#0e3a2f; color:#34d399; border:1px solid #059669; border-radius:8px; text-decoration:none; font-weight:600; text-align:center; font-size:13px;">
-          ⬇ Download PrintBridge Pro 2.1v APK (Fixes Idle Disconnect)
+        <a href="/apk/PrintBridge_Pro_2.2v_SPEED_AND_PORTRAIT.apk" download="PrintBridge_Pro_SPEED_TEST.apk" style="display:block; padding:10px 14px; background:#0e3a2f; color:#34d399; border:1px solid #059669; border-radius:8px; text-decoration:none; font-weight:600; text-align:center; font-size:13px;">
+          ⬇ Download PrintBridge Pro 2.2v APK (Speed & Portrait Fix)
         </a>
       </div>
       <h2 style="font-size:12px; letter-spacing:1px; color:#8892b0; margin-bottom:10px; text-transform:uppercase;">
@@ -289,11 +295,13 @@
 <script>
   window.initPrintForm = function(endpoints, opts){
     // Defensive guard: if this ever gets called a second time for the same
-    // page load (e.g. a reconnect re-running the connect flow), don't
-    // attach a second set of event listeners to the same form — that would
-    // cause every print to fire twice.
+    // page load, don't attach duplicate event listeners.
     const form = document.getElementById('printForm');
-    if (form.dataset.initialized === 'true') return;
+    if (form.dataset.initialized === 'true') {
+      if (typeof window.refreshPrintersExternal === 'function') window.refreshPrintersExternal();
+      if (typeof window.refreshJobsExternal === 'function') window.refreshJobsExternal();
+      return;
+    }
     form.dataset.initialized = 'true';
 
     const isRemote = !!(opts && opts.remote);
@@ -318,6 +326,8 @@
     const flipMessage = document.getElementById('flipMessage');
     const flipContinueBtn = document.getElementById('flipContinueBtn');
     const flipCancelBtn = document.getElementById('flipCancelBtn');
+    const refreshPrintersBtn = document.getElementById('refreshPrintersBtn');
+    const refreshJobsBtn = document.getElementById('refreshJobsBtn');
 
     let pendingJobId = null;
 
@@ -326,7 +336,8 @@
     });
 
     let copies = 1;
-    let jobs = [];
+    let localJobs = [];
+    let serverJobs = [];
     let printersData = [];
     const COMMON_PAPER_SIZES = ["A4", "letter", "legal", "A3", "A5", "tabloid"];
 
@@ -344,24 +355,115 @@
 
     async function loadPrinters(){
       try{
+        printerSelect.innerHTML = '<option value="">Checking printer status…</option>';
         const res = await fetch(endpoints.printers);
         const data = await res.json();
         printersData = data.printers || [];
-        if (!printersData.length){ printerSelect.innerHTML = '<option value="">No printers found</option>'; return; }
+        if (!printersData.length){
+          printerSelect.innerHTML = '<option value="">No printers found (Plug USB into host & tap Reload)</option>';
+          return;
+        }
         printerSelect.innerHTML = printersData.map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('');
         refreshPaperSizeOptions();
-      }catch(e){ printerSelect.innerHTML = '<option value="">Could not load printers</option>'; }
+      }catch(e){
+        printerSelect.innerHTML = '<option value="">Could not load printers (Tap Reload printers)</option>';
+      }
+    }
+    window.refreshPrintersExternal = loadPrinters;
+
+    async function fetchServerJobs(){
+      if (!endpoints.telemetry) return;
+      try {
+        const res = await fetch(endpoints.telemetry, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data.recentJobs)) {
+          serverJobs = data.recentJobs;
+          renderJobs();
+        }
+      } catch {}
+    }
+    window.refreshJobsExternal = fetchServerJobs;
+
+    function renderJobs(){
+      const allJobs = [];
+      const seen = new Set();
+
+      // Server jobs (authoritative telemetry from relay)
+      for (const j of serverJobs) {
+        const id = j.jobId || `${j.timestamp}_${j.filename}`;
+        if (!seen.has(id)) {
+          seen.add(id);
+          const isOk = j.status === "success" || j.ok === true;
+          const timeStr = j.timestamp ? new Date(j.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+          allJobs.push({
+            ok: isOk,
+            name: j.filename || "Document",
+            printer: j.printer || "HP Laser",
+            time: timeStr,
+            error: j.error,
+          });
+        }
+      }
+
+      // Add local session jobs
+      for (const j of localJobs) {
+        const id = `${j.name}_${j.printer}_${j.time}`;
+        if (!seen.has(id)) {
+          seen.add(id);
+          allJobs.push({
+            ok: j.ok,
+            name: j.name,
+            printer: j.printer,
+            time: j.time || 'Just now',
+            error: j.error,
+          });
+        }
+      }
+
+      if (!allJobs.length){
+        jobList.innerHTML = '<p class="empty">Nothing printed yet on this server.</p>';
+        return;
+      }
+
+      jobList.innerHTML = allJobs.slice(0, 15).map(j => {
+        const mark = j.ok
+          ? '<span style="color:var(--ok); font-weight:bold; font-size:15px; margin-right:6px;">✓</span>'
+          : '<span style="color:var(--stamp-dark); font-weight:bold; font-size:15px; margin-right:6px;">✕</span>';
+        const timeHtml = j.time
+          ? `<span style="color:var(--ink-soft); font-size:11px; margin-right:6px;">${escapeHtml(j.time)}</span>`
+          : '';
+        const titleAttr = j.error ? `title="${escapeHtml(j.error)}"` : '';
+        return `<div class="job" ${titleAttr} style="display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid #EEF0F2;">
+          <div style="display:flex; align-items:center; overflow:hidden; flex:1; min-width:0;">
+            ${mark}
+            <span class="name" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(j.name)}</span>
+          </div>
+          <div style="display:flex; align-items:center; flex:none; margin-left:8px;">
+            ${timeHtml}
+            <span class="via" style="color:var(--ink-soft); font-size:12px;">${escapeHtml(j.printer)}</span>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    if (refreshPrintersBtn) {
+      refreshPrintersBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        loadPrinters();
+      });
+    }
+    if (refreshJobsBtn) {
+      refreshJobsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        fetchServerJobs();
+      });
     }
 
     printerSelect.addEventListener('change', refreshPaperSizeOptions);
     fileInput.addEventListener('change', () => { filenameLabel.textContent = fileInput.files[0] ? fileInput.files[0].name : 'No file chosen'; });
     minusBtn.addEventListener('click', () => { copies = Math.max(1, copies - 1); copiesVal.textContent = copies; });
     plusBtn.addEventListener('click', () => { copies = Math.min(50, copies + 1); copiesVal.textContent = copies; });
-
-    function renderJobs(){
-      if (!jobs.length){ jobList.innerHTML = '<p class="empty">Nothing printed yet this session.</p>'; return; }
-      jobList.innerHTML = jobs.map(j => `<div class="job"><span>${j.ok ? '✓' : '✕'}</span><span class="name">${escapeHtml(j.name)}</span><span class="via">${escapeHtml(j.printer)}</span></div>`).join('');
-    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -407,11 +509,13 @@
 
           statusEl.textContent = data.note ? data.note : 'Sent to printer.';
           statusEl.className = 'status ok';
-          jobs.unshift({ ok: true, name: fileInput.files[0].name, printer: printerSelect.value });
+          localJobs.unshift({ ok: true, name: fileInput.files[0].name, printer: printerSelect.value, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+          fetchServerJobs();
         }catch(err){
           statusEl.textContent = err.message;
           statusEl.className = 'status err';
-          jobs.unshift({ ok: false, name: fileInput.files[0].name, printer: printerSelect.value });
+          localJobs.unshift({ ok: false, name: fileInput.files[0].name, printer: printerSelect.value, error: err.message, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+          fetchServerJobs();
         }finally{
           printBtn.textContent = 'PRINT'; renderJobs();
           if (!flipBanner.classList.contains('hidden')) return;
@@ -448,7 +552,8 @@
           }
           statusEl.textContent = `Printed the remaining ${data.evenCount} page(s). Both sides done.`;
           statusEl.className = 'status ok';
-          jobs.unshift({ ok: true, name: fileInput.files[0].name + ' (side 2)', printer: printerSelect.value });
+          localJobs.unshift({ ok: true, name: fileInput.files[0].name + ' (side 2)', printer: printerSelect.value });
+          fetchServerJobs();
         }catch(err){
           statusEl.textContent = err.message;
           statusEl.className = 'status err';
@@ -475,6 +580,15 @@
     });
 
     loadPrinters();
+    fetchServerJobs();
+    if (endpoints.telemetry) {
+      const pollTimer = setInterval(() => {
+        if (!document.hidden) {
+          fetchServerJobs();
+        }
+      }, 4000);
+      window.addEventListener('beforeunload', () => clearInterval(pollTimer));
+    }
   };
 </script>
 </body>
