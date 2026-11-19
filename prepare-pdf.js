@@ -1,12 +1,11 @@
 const { PDFDocument, degrees } = require("pdf-lib");
 
-// HP LaserJet 1020 / P1007 laser engine geometry:
-// Horizontal line across 210mm = 9920 dots at 1200 DPI
-// Vertical drum length down 297mm = 7016 lines at 600 DPI
-// Native aspect ratio = 9920 / 7016 = 1.41391106
-const TARGET_RATIO = 9920 / 7016;
+// HP LaserJet 1020 / P1007 laser engine geometry at 600x600 DPI (isotropic 1:1, 1-bit native mode):
+// Standard A4 portrait in points: 210mm x 297mm = 595.28 pt x 841.89 pt
+// Native aspect ratio = 595.28 / 841.89 = 0.7071 (matches physical A4 paper exactly)
+const TARGET_PAGE_W = 595.28; // Standard A4 width in points (210mm)
 const TARGET_PAGE_H = 841.89; // Standard A4 height in points (297mm)
-const TARGET_PAGE_W = TARGET_PAGE_H * TARGET_RATIO; // 1190.35758 points
+const TARGET_RATIO = TARGET_PAGE_W / TARGET_PAGE_H;
 
 const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png"]);
 
