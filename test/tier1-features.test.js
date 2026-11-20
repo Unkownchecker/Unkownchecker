@@ -191,8 +191,8 @@ suite.test("1.11 Normalizer: Auto-rotates landscape image into portrait drum dim
   const outDoc = await PDFDocument.load(result.buffer);
   const page = outDoc.getPage(0);
   const { width, height } = page.getSize();
-  assert.strictEqual(Math.round(width * 100) / 100, Math.round(TARGET_PAGE_W * 100) / 100);
-  assert.strictEqual(Math.round(height * 100) / 100, Math.round(TARGET_PAGE_H * 100) / 100);
+  assert.strictEqual(Math.round(width * 100) / 100, Math.round(TARGET_PAGE_H * 100) / 100);
+  assert.strictEqual(Math.round(height * 100) / 100, Math.round(TARGET_PAGE_W * 100) / 100);
 });
 
 // Run if executed directly

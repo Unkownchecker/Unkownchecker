@@ -63,8 +63,8 @@ suite.test("2.4 Extreme Dimension: Super wide landscape banner (1600pt width x 2
   const outPage = outDoc.getPage(0);
   const { width, height } = outPage.getSize();
 
-  assert.strictEqual(Math.round(width * 10) / 10, Math.round(TARGET_PAGE_W * 10) / 10);
-  assert.strictEqual(Math.round(height * 10) / 10, Math.round(TARGET_PAGE_H * 10) / 10);
+  assert.strictEqual(Math.round(width * 10) / 10, Math.round(TARGET_PAGE_H * 10) / 10);
+  assert.strictEqual(Math.round(height * 10) / 10, Math.round(TARGET_PAGE_W * 10) / 10);
 });
 
 suite.test("2.5 Square Aspect Ratio: Exactly 1:1 page (500pt x 500pt)", async () => {

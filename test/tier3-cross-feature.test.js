@@ -39,12 +39,14 @@ suite.test("3.1 Mixed Orientation: Multi-page doc with portrait + landscape main
   const outDoc = await PDFDocument.load(result.buffer);
   assert.strictEqual(outDoc.getPageCount(), 3, "Must retain 3 pages");
 
-  // All output pages in the normalized print stream must conform to standard target drum size
+  // Portrait pages (0 and 2) use TARGET_PAGE_W x TARGET_PAGE_H, landscape page (1) uses TARGET_PAGE_H x TARGET_PAGE_W
   for (let i = 0; i < 3; i++) {
     const page = outDoc.getPage(i);
     const { width, height } = page.getSize();
-    assert.strictEqual(Math.round(width * 10) / 10, Math.round(TARGET_PAGE_W * 10) / 10, `Page ${i + 1} width`);
-    assert.strictEqual(Math.round(height * 10) / 10, Math.round(TARGET_PAGE_H * 10) / 10, `Page ${i + 1} height`);
+    const expectedW = (i === 1) ? TARGET_PAGE_H : TARGET_PAGE_W;
+    const expectedH = (i === 1) ? TARGET_PAGE_W : TARGET_PAGE_H;
+    assert.strictEqual(Math.round(width * 10) / 10, Math.round(expectedW * 10) / 10, `Page ${i + 1} width`);
+    assert.strictEqual(Math.round(height * 10) / 10, Math.round(expectedH * 10) / 10, `Page ${i + 1} height`);
   }
 });
 

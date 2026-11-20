@@ -310,6 +310,7 @@ app.post("/relay/:id/print", upload.single("file"), async (req, res) => {
           pages: req.body.pages,
           monochrome: req.body.monochrome,
           isPreformatted: isPreformatted,
+          bottomMarginInches: req.body.bottomMarginInches !== undefined ? parseFloat(req.body.bottomMarginInches) : 0.0,
         },
       },
       90000

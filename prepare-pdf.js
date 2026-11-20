@@ -42,22 +42,33 @@ async function prepareDocumentForPrinter(fileBuffer, originalFilename, options =
           options.orientation === "landscape" ||
           (options.orientation !== "portrait" && isLandscape);
 
-        const outPage = outDoc.addPage([TARGET_PAGE_W, TARGET_PAGE_H]);
+        const pageW = shouldBeLandscape ? TARGET_PAGE_H : TARGET_PAGE_W;
+        const pageH = shouldBeLandscape ? TARGET_PAGE_W : TARGET_PAGE_H;
+        const bottomMarginPt = typeof options.bottomMarginPt === "number" ? options.bottomMarginPt : 0;
+        const availH = pageH - bottomMarginPt;
+
+        const scale = Math.min(pageW / img.width, availH / img.height);
+        const drawW = img.width * scale;
+        const drawH = img.height * scale;
+        const x = (pageW - drawW) / 2;
+        const y = pageH - drawH;
+
+        const outPage = outDoc.addPage([pageW, pageH]);
 
         if (shouldBeLandscape) {
           outPage.drawImage(img, {
-            x: 0,
-            y: TARGET_PAGE_H,
-            width: TARGET_PAGE_H,
-            height: TARGET_PAGE_W,
+            x,
+            y: pageH,
+            width: drawH,
+            height: drawW,
             rotate: degrees(-90),
           });
         } else {
           outPage.drawImage(img, {
-            x: 0,
-            y: 0,
-            width: TARGET_PAGE_W,
-            height: TARGET_PAGE_H,
+            x,
+            y,
+            width: drawW,
+            height: drawH,
           });
         }
 
@@ -101,7 +112,22 @@ async function prepareDocumentForPrinter(fileBuffer, originalFilename, options =
         options.orientation === "landscape" ||
         (options.orientation !== "portrait" && isLandscapeVisual);
 
-      const outPage = outDoc.addPage([TARGET_PAGE_W, TARGET_PAGE_H]);
+      const targetW = shouldBeLandscape ? TARGET_PAGE_H : TARGET_PAGE_W;
+      const targetH = shouldBeLandscape ? TARGET_PAGE_W : TARGET_PAGE_H;
+      const bottomMarginPt = typeof options.bottomMarginPt === "number" ? options.bottomMarginPt : 0;
+      const targetAvailH = targetH - bottomMarginPt;
+
+      // 100% 1:1 true scale: never shrink documents that already fit within target dimensions!
+      let scale = 1.0;
+      if (visualW > targetW || visualH > targetAvailH) {
+        scale = Math.min(targetW / visualW, targetAvailH / visualH);
+      }
+      const drawW = visualW * scale;
+      const drawH = visualH * scale;
+      const x = (targetW - drawW) / 2;
+      const y = targetH - drawH; // Top-aligned in PDF space
+
+      const outPage = outDoc.addPage([targetW, targetH]);
 
       try {
         const [embedded] = await outDoc.embedPdf(srcDoc, [i]);
@@ -112,18 +138,18 @@ async function prepareDocumentForPrinter(fileBuffer, originalFilename, options =
             const angle = rot === 180 ? 90 : -90;
             if (angle === -90) {
               outPage.drawPage(embedded, {
-                x: 0,
-                y: TARGET_PAGE_H,
-                width: TARGET_PAGE_H,
-                height: TARGET_PAGE_W,
+                x,
+                y: targetH,
+                width: drawH,
+                height: drawW,
                 rotate: degrees(-90),
               });
             } else {
               outPage.drawPage(embedded, {
-                x: TARGET_PAGE_W,
+                x: targetW - x,
                 y: 0,
-                width: TARGET_PAGE_H,
-                height: TARGET_PAGE_W,
+                width: drawH,
+                height: drawW,
                 rotate: degrees(90),
               });
             }
@@ -131,17 +157,17 @@ async function prepareDocumentForPrinter(fileBuffer, originalFilename, options =
             // Page with /Rotate 90 or 270 tag
             if (rot === 90) {
               outPage.drawPage(embedded, {
-                x: 0,
-                y: 0,
-                width: TARGET_PAGE_W,
-                height: TARGET_PAGE_H,
+                x,
+                y,
+                width: drawW,
+                height: drawH,
               });
             } else {
               outPage.drawPage(embedded, {
-                x: TARGET_PAGE_W,
-                y: TARGET_PAGE_H,
-                width: TARGET_PAGE_W,
-                height: TARGET_PAGE_H,
+                x: targetW - x,
+                y: targetH - y,
+                width: drawW,
+                height: drawH,
                 rotate: degrees(180),
               });
             }
@@ -151,35 +177,35 @@ async function prepareDocumentForPrinter(fileBuffer, originalFilename, options =
           if (!isRotated90or270) {
             if (rot === 180) {
               outPage.drawPage(embedded, {
-                x: TARGET_PAGE_W,
-                y: TARGET_PAGE_H,
-                width: TARGET_PAGE_W,
-                height: TARGET_PAGE_H,
+                x: targetW - x,
+                y: targetH - y,
+                width: drawW,
+                height: drawH,
                 rotate: degrees(180),
               });
             } else {
               outPage.drawPage(embedded, {
-                x: 0,
-                y: 0,
-                width: TARGET_PAGE_W,
-                height: TARGET_PAGE_H,
+                x,
+                y,
+                width: drawW,
+                height: drawH,
               });
             }
           } else {
             if (rot === 90) {
               outPage.drawPage(embedded, {
-                x: 0,
-                y: TARGET_PAGE_H,
-                width: TARGET_PAGE_H,
-                height: TARGET_PAGE_W,
+                x,
+                y: targetH,
+                width: drawH,
+                height: drawW,
                 rotate: degrees(-90),
               });
             } else {
               outPage.drawPage(embedded, {
-                x: TARGET_PAGE_W,
+                x: targetW - x,
                 y: 0,
-                width: TARGET_PAGE_H,
-                height: TARGET_PAGE_W,
+                width: drawH,
+                height: drawW,
                 rotate: degrees(90),
               });
             }
